@@ -1,0 +1,74 @@
+name: Build & Release
+
+# Builds SkillForge for macOS, Windows, and Linux on GitHub-hosted runners and
+# attaches the installers (with stable, version-less names) to the GitHub
+# Release for the pushed tag — the exact names the website buttons point to.
+#
+# Layout assumed: this file lives at  .github/workflows/release.yml  in the
+# thirukguru/skillforgesite repo, and the Electron app source is in  app/ .
+#
+# Trigger:  git tag v1.0.1 && git push origin v1.0.1   (or "Run workflow").
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: npm run build:mac
+            glob: app/release/*.dmg
+            asset: SkillForge-macOS-arm64.dmg
+          - os: windows-latest
+            build: npm run build:win
+            glob: app/release/*Setup*.exe
+            asset: SkillForge-Windows-x64.exe
+          - os: ubuntu-latest
+            build: npm run build:linux
+            glob: app/release/*.AppImage
+            asset: SkillForge-Linux-x86_64.AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: ${{ matrix.build }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Copy the produced installer to a stable name at the repo root so the
+      # website's releases/latest/download/<name> links keep working.
+      - name: Stage asset (bash)
+        if: runner.os != 'Windows'
+        working-directory: ${{ github.workspace }}
+        run: cp "$(ls ${{ matrix.glob }} | head -n1)" "${{ matrix.asset }}"
+      - name: Stage asset (pwsh)
+        if: runner.os == 'Windows'
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: Copy-Item (Get-ChildItem ${{ matrix.glob }} | Select-Object -First 1).FullName "${{ matrix.asset }}"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
+          fail_on_unmatched_files: true
