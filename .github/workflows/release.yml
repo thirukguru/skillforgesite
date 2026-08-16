@@ -44,16 +44,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
 
       - run: npm ci
 
+      # Build installers only — do NOT let electron-builder publish (no token
+      # here). The release upload is handled by action-gh-release below.
       - name: Build
         run: ${{ matrix.build }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       # Copy the produced installer to a stable name at the repo root so the
       # website's releases/latest/download/<name> links keep working.
