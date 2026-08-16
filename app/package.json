@@ -76,6 +76,7 @@
   "build": {
     "appId": "com.skillforge.app",
     "productName": "SkillForge",
+    "afterPack": "build/afterPack.cjs",
     "directories": {
       "output": "release"
     },
